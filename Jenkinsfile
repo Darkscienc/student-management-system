@@ -1,65 +1,61 @@
-pipeline {
+node {
 
-    agent {
-        docker {
-            image 'python:3.12'
-        }
+    stage('Checkout') {
+        checkout scm
     }
 
-    stages {
-
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage('Install Dependencies') {
-            steps {
-                sh 'pip install -r requirements.txt'
-            }
-        }
-
-        stage('Run Application') {
-            steps {
-                sh 'python app.py'
-            }
-        }
-
-        stage('Run Unit Tests') {
-            steps {
-                sh 'pytest'
-            }
-        }
-
-        stage('Code Quality') {
-            steps {
-                sh 'flake8 .'
-            }
-        }
-
-        stage('Generate Coverage') {
-            steps {
-                sh 'coverage run -m pytest'
-                sh 'coverage xml'
-            }
-        }
-
-        stage('Archive Reports') {
-            steps {
-                archiveArtifacts artifacts: '*.xml', fingerprint: true
-            }
-        }
-
+    stage('Check Python') {
+        sh 'python3 --version'
     }
 
-    post {
-        success {
-            echo 'Pipeline Completed Successfully'
-        }
+    stage('Create Virtual Environment') {
+        sh 'python3 -m venv venv'
+    }
 
-        failure {
-            echo 'Pipeline Failed'
-        }
+    stage('Install Dependencies') {
+        sh '''
+            . venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+        '''
+    }
+
+    stage('Run Application') {
+        sh '''
+            . venv/bin/activate
+            python app.py
+        '''
+    }
+
+    stage('Run Unit Tests') {
+        sh '''
+            . venv/bin/activate
+            pytest --junitxml=test-results.xml
+        '''
+    }
+
+    stage('Code Quality Check') {
+        sh '''
+            . venv/bin/activate
+            flake8 .
+        '''
+    }
+
+    stage('Generate Coverage Report') {
+        sh '''
+            . venv/bin/activate
+            coverage run -m pytest
+            coverage xml
+        '''
+    }
+
+    stage('Archive Reports') {
+        archiveArtifacts artifacts: '*.xml', fingerprint: true
+        
+        junit 'test-results.xml'
+    }
+
+    stage('Build Completed') {
+        echo 'CI Pipeline Completed Successfully'
     }
 }
