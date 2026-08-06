@@ -1,55 +1,65 @@
-node {
+pipeline {
 
-    stage('Checkout') {
-        checkout scm
+    agent {
+        docker {
+            image 'python:3.12'
+        }
     }
 
-    stage('Create Virtual Environment') {
-        sh 'python3 -m venv venv'
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh 'pip install -r requirements.txt'
+            }
+        }
+
+        stage('Run Application') {
+            steps {
+                sh 'python app.py'
+            }
+        }
+
+        stage('Run Unit Tests') {
+            steps {
+                sh 'pytest'
+            }
+        }
+
+        stage('Code Quality') {
+            steps {
+                sh 'flake8 .'
+            }
+        }
+
+        stage('Generate Coverage') {
+            steps {
+                sh 'coverage run -m pytest'
+                sh 'coverage xml'
+            }
+        }
+
+        stage('Archive Reports') {
+            steps {
+                archiveArtifacts artifacts: '*.xml', fingerprint: true
+            }
+        }
+
     }
 
-    stage('Install Dependencies') {
-        sh '''
-            . venv/bin/activate
-            pip install -r requirements.txt
-        '''
-    }
+    post {
+        success {
+            echo 'Pipeline Completed Successfully'
+        }
 
-    stage('Run Application') {
-        sh '''
-            . venv/bin/activate
-            python app.py
-        '''
-    }
-
-    stage('Run Unit Tests') {
-        sh '''
-            . venv/bin/activate
-            pytest --junitxml=pytest-report.xml
-        '''
-    }
-
-    stage('Code Quality') {
-        sh '''
-            . venv/bin/activate
-            flake8 .
-        '''
-    }
-
-    stage('Generate Coverage') {
-        sh '''
-            . venv/bin/activate
-            coverage run -m pytest
-            coverage xml
-        '''
-    }
-
-    stage('Archive Reports') {
-        junit 'pytest-report.xml'
-        archiveArtifacts artifacts: '*.xml', fingerprint: true
-    }
-
-    stage('Finish') {
-        echo 'Pipeline Completed Successfully'
+        failure {
+            echo 'Pipeline Failed'
+        }
     }
 }
